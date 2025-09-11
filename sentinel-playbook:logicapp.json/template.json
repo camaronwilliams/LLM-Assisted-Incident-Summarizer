@@ -1,0 +1,127 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_LLM_Incident_Summarizer_name": {
+            "defaultValue": "LLM-Incident-Summarizer",
+            "type": "String"
+        },
+        "incidents_12345678_90ab_cdef_1234_567890abcdef_externalid": {
+            "defaultValue": "/subscriptions/3f173bcc-60aa-4db0-9dd1-ff7ce83a45c8/resourceGroups/SIEM-Lab/providers/Microsoft.OperationalInsights/workspaces/SIEM-Lab-Workspace/providers/Microsoft.SecurityInsights/incidents/12345678-90ab-cdef-1234-567890abcdef",
+            "type": "String"
+        },
+        "connections_azuresentinel_externalid": {
+            "defaultValue": "/subscriptions/3f173bcc-60aa-4db0-9dd1-ff7ce83a45c8/resourceGroups/SIEM-Lab/providers/Microsoft.Web/connections/azuresentinel",
+            "type": "String"
+        },
+        "connections_outlook_externalid": {
+            "defaultValue": "/subscriptions/3f173bcc-60aa-4db0-9dd1-ff7ce83a45c8/resourceGroups/SIEM-Lab/providers/Microsoft.Web/connections/outlook",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_LLM_Incident_Summarizer_name')]",
+            "location": "canadacentral",
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "Microsoft_Sentinel_incident": {
+                            "type": "ApiConnectionWebhook",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                                    }
+                                },
+                                "body": {
+                                    "callback_url": "@listCallbackUrl()"
+                                },
+                                "path": "/incident-creation"
+                            }
+                        }
+                    },
+                    "actions": {
+                        "Compose_Incident_Message": {
+                            "runAfter": {
+                                "Get_incident": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Compose",
+                            "inputs": "Incident '' of severity  triggered by  on  in resource group .\n"
+                        },
+                        "Send_Email": {
+                            "runAfter": {
+                                "Compose_Incident_Message": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['outlook']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "body": {
+                                    "To": "techwithcam@outlook.com",
+                                    "Subject": "Sentinel Incident Summary",
+                                    "Body": "<p>@{outputs('Compose_Incident_Message')}</p>",
+                                    "Importance": "High"
+                                },
+                                "path": "/v2/Mail"
+                            }
+                        },
+                        "Get_incident": {
+                            "runAfter": {},
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "body": {
+                                    "incidentArmId": "[parameters('incidents_12345678_90ab_cdef_1234_567890abcdef_externalid')]"
+                                },
+                                "path": "/Incidents"
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "azuresentinel": {
+                                "id": "/subscriptions/3f173bcc-60aa-4db0-9dd1-ff7ce83a45c8/providers/Microsoft.Web/locations/canadacentral/managedApis/azuresentinel",
+                                "connectionId": "[parameters('connections_azuresentinel_externalid')]",
+                                "connectionName": "azuresentinel"
+                            },
+                            "outlook": {
+                                "id": "/subscriptions/3f173bcc-60aa-4db0-9dd1-ff7ce83a45c8/providers/Microsoft.Web/locations/canadacentral/managedApis/outlook",
+                                "connectionId": "[parameters('connections_outlook_externalid')]",
+                                "connectionName": "outlook"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}
