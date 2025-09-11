@@ -19,14 +19,101 @@ When a VM is created or deleted, the system automatically:
 ---
 
 ## Workflow Diagram
-![Workflow Diagram](diagrams/WorkflowDiagram.png)  
+VM event → Sentinel alert → Incident → Logic App → LLM → Teams / Email 
 
+Here’s the workflow visual:
+
+VM Create/Delete Event
+        │
+        ▼
+Azure Sentinel Analytics Rule
+        │
+        ▼
+Incident Triggered
+        │
+        ▼
+Logic App Playbook
+        │
+ ┌──────┴───────┐
+ ▼              ▼
+LLM           Email / Teams
 ---
 
 ## Screenshots
-- Sentinel Analytics Rule: ![Sentinel Rule](screenshots/SentinelRule.png)  
-- Logic App Designer: ![Logic App](screenshots/LogicAppDesigner.png)  
-- Teams Output: ![Teams Output](screenshots/TeamsOutput.png)  
+- Sentinel Analytics Rule: ![Sentinel Rule](<img width="469" height="738" alt="Screenshot 2025-09-10 at 10 27 08 PM" src="https://github.com/user-attachments/assets/f8db6c28-6f57-454a-a4bf-b16e0be113b0" />
+)  
+- Logic App Designer: ![Logic App](<img width="670" height="773" alt="Screenshot 2025-09-10 at 10 39 57 PM" src="https://github.com/user-attachments/assets/13f1698e-8614-4267-ad1c-28104ad9de96" />
+)  
+- Teams Output: ![Teams Output](<img width="964" height="302" alt="Screenshot 2025-09-10 at 10 25 23 PM" src="https://github.com/user-attachments/assets/fb1a751d-cc8e-4174-8e15-37fd7ec0fde1" />
+)  
+
+---
+
+## Code Snippets
+1. Sentinel Analytics Rule KQL
+AzureActivity
+| where OperationNameValue in ("MICROSOFT.COMPUTE/VIRTUALMACHINES/WRITE", "MICROSOFT.COMPUTE/VIRTUALMACHINES/DELETE")
+      and ActivityStatusValue == "Start"
+| project
+    TimeGenerated,
+    OperationNameValue,
+    ActivityStatusValue,
+    VM_Name = Properties_d.resource,
+    ResourceGroup,
+    SubscriptionId,
+    Initiated_By = Caller
+| order by TimeGenerated desc
+
+2. Logic App Trigger (Incident Trigger)
+{
+  "type": "ApiConnectionWebhook",
+  "inputs": {
+    "host": {
+      "connection": { "name": "@parameters('$connections')['azuresentinel']['connectionId']" }
+    },
+    "body": { "callback_url": "@listCallbackUrl()" },
+    "path": "/incident-creation"
+  }
+}
+
+3. Logic App Actions
+
+Get Incident Details
+
+{
+  "type": "ApiConnection",
+  "inputs": {
+    "host": { "connection": { "name": "@parameters('$connections')['azuresentinel']['connectionId']" } },
+    "method": "get",
+    "path": "/Incidents/subscriptions/@{encodeURIComponent('3f173bcc-60aa-4db0-9dd1-ff7ce83a45c8')}/resourceGroups/@{encodeURIComponent('SIEM-Lab')}/workspaces/@{encodeURIComponent('d0a3af8a-abda-45ce-93ab-330188610950')}/alerts/@{encodeURIComponent('16a47000-1fd3-4ccb-8389-50fcf805287c')}"
+  }
+}
+
+
+Compose Email Body
+
+{
+  "type": "Compose",
+  "inputs": "Incident '@{triggerOutputs()?['body/Title']}' of severity @{triggerOutputs()?['body/Severity']} triggered by @{triggerOutputs()?['body/Caller']} on @{triggerOutputs()?['body/Resource']}."
+}
+
+
+Send Email (V2)
+
+{
+  "type": "ApiConnection",
+  "inputs": {
+    "host": { "connection": { "name": "@parameters('$connections')['outlook']['connectionId']" } },
+    "method": "post",
+    "body": {
+      "To": "techwithcam@outlook.com",
+      "Subject": "Sentinel Incident Summary",
+      "Body": "<p>@{outputs('Compose')}</p>",
+      "Importance": "High"
+    },
+    "path": "/v2/Mail"
+  }
+}
 
 ---
 
