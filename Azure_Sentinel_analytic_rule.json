@@ -1,0 +1,88 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/16a47000-1fd3-4ccb-8389-50fcf805287c')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/16a47000-1fd3-4ccb-8389-50fcf805287c')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "VM-Create-Delete-Alert",
+                "description": "Alerts when a VM is created or deleted in the subscription",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "AzureActivity\n| where OperationNameValue in (\"MICROSOFT.COMPUTE/VIRTUALMACHINES/WRITE\", \"MICROSOFT.COMPUTE/VIRTUALMACHINES/DELETE\")\n    and ActivityStatusValue == \"Start\"\n",
+                "queryFrequency": "PT5M",
+                "queryPeriod": "PT5H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 1,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [],
+                "techniques": [],
+                "subTechniques": [],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": {
+                    "alertDisplayNameFormat": "VM Created or Deleted",
+                    "alertDescriptionFormat": "An alert is triggered when a virtual machine is created or deleted in the subscription. Provides visibility into changes that could impact security or operations.",
+                    "alertDynamicProperties": []
+                },
+                "customDetails": {
+                    "User": "Caller",
+                    "VMName": "Resource",
+                    "Operation": "OperationNameValue",
+                    "Status": "ActivityStatusValue",
+                    "ResourceGroup": "ResourceGroup",
+                    "SubscriptionID": "SubscriptionId",
+                    "CorrelationID": "CorrelationId",
+                    "TimeGenerated": "TimeGenerated"
+                },
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Name",
+                                "columnName": "Caller"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "AzureResource",
+                        "fieldMappings": [
+                            {
+                                "identifier": "ResourceId",
+                                "columnName": "Resource"
+                            }
+                        ]
+                    }
+                ],
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        }
+    ]
+}

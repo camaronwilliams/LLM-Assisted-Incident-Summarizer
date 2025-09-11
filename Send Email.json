@@ -1,0 +1,58 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/AutomationRules/f1865302-10a0-4ccf-8f67-81f8e651e0f2')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/f1865302-10a0-4ccf-8f67-81f8e651e0f2')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/AutomationRules",
+            "apiVersion": "2024-04-01-preview",
+            "properties": {
+                "displayName": "Send Email",
+                "order": 1,
+                "triggeringLogic": {
+                    "isEnabled": true,
+                    "triggersOn": "Incidents",
+                    "triggersWhen": "Created",
+                    "conditions": [
+                        {
+                            "conditionType": "Property",
+                            "conditionProperties": {
+                                "propertyName": "IncidentProviderName",
+                                "operator": "Equals",
+                                "propertyValues": [
+                                    "Azure Sentinel"
+                                ]
+                            }
+                        },
+                        {
+                            "conditionType": "Property",
+                            "conditionProperties": {
+                                "propertyName": "IncidentRelatedAnalyticRuleIds",
+                                "operator": "Contains",
+                                "propertyValues": [
+                                    "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/', '16a47000-1fd3-4ccb-8389-50fcf805287c')]"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "actions": [
+                    {
+                        "order": 1,
+                        "actionType": "RunPlaybook",
+                        "actionConfiguration": {
+                            "logicAppResourceId": "/subscriptions/3f173bcc-60aa-4db0-9dd1-ff7ce83a45c8/resourceGroups/SIEM-Lab/providers/Microsoft.Logic/workflows/LLM-Incident-Summarizer",
+                            "tenantId": "25a5d340-8abc-4053-b4bd-dc1213280353"
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}
